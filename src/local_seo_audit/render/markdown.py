@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
 
@@ -49,6 +52,43 @@ def _vitals_lines(vitals: VitalsResult) -> list[str]:
     return lines
 
 
+def _site_crawl_lines(crawl: SiteCrawlReport) -> list[str]:
+    lines = [
+        "## Site crawl",
+        "",
+        f"Visited {crawl.pages_crawled} page(s) (cap {crawl.max_pages}); "
+        f"{len(crawl.sitemap_urls)} URL(s) in the sitemap; "
+        f"**{crawl.issue_count()} site-level issue(s)** found.",
+        "",
+        "| URL | Status | Depth | Title | Words |",
+        "|---|---|---|---|---|",
+    ]
+    for page in sorted(crawl.pages, key=lambda p: p.url):
+        status = "OK" if page.ok else f"HTTP {page.status_code}"
+        title = page.title or "(no title)"
+        lines.append(f"| {page.url} | {status} | {page.depth} | {title} | {page.word_count} |")
+    lines.append("")
+
+    def _list(label: str, items: Sequence[object]) -> None:
+        if items:
+            lines.append(f"- **{label}:** {len(items)}")
+
+    _list("Duplicate titles", crawl.duplicate_titles)
+    _list("Duplicate meta descriptions", crawl.duplicate_descriptions)
+    _list("Missing H1", crawl.missing_h1)
+    _list("Duplicate H1", crawl.duplicate_h1_pages)
+    _list("Heading order issues", crawl.heading_order_issues)
+    _list("Thin content pages", crawl.thin_content)
+    _list("Canonical issues", crawl.canonical_issues)
+    _list("Redirect chains", crawl.redirect_chains)
+    _list("Error pages (4xx/5xx)", crawl.error_pages)
+    _list("Orphan pages (in sitemap, not linked)", crawl.orphan_pages)
+    _list("Pages deeper than 3 clicks", crawl.deep_pages)
+    _list("Crawled pages missing from sitemap", crawl.missing_from_sitemap)
+    lines.append("")
+    return lines
+
+
 def render_markdown(report: Report) -> str:
     lines: list[str] = [f"# Local SEO Audit — {report.url}", ""]
     if report.business.name:
@@ -80,5 +120,8 @@ def render_markdown(report: Report) -> str:
 
     if report.vitals is not None:
         lines.extend(_vitals_lines(report.vitals))
+
+    if report.site_crawl is not None:
+        lines.extend(_site_crawl_lines(report.site_crawl))
 
     return "\n".join(lines).rstrip() + "\n"

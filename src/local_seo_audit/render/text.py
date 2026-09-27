@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Sequence
 
 from rich.console import Console
 
+from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
 
@@ -70,6 +72,38 @@ def _print_vitals(console: Console, vitals: VitalsResult) -> None:
         _print_strategy(console, result)
 
 
+def _print_site_crawl(console: Console, crawl: SiteCrawlReport) -> None:
+    console.print("")
+    console.print(
+        f"[bold]Site crawl[/bold]: {crawl.pages_crawled} page(s) visited "
+        f"(cap {crawl.max_pages}), {len(crawl.sitemap_urls)} in sitemap, "
+        f"{crawl.issue_count()} site-level issue(s) found."
+    )
+    console.print("  Pages:")
+    for page in sorted(crawl.pages, key=lambda p: p.url):
+        status = "OK" if page.ok else f"ERROR {page.status_code}"
+        console.print(
+            f"    [{status}] depth {page.depth}  {page.url}  {page.title or '(no title)'}"
+        )
+
+    def _list(label: str, items: Sequence[object]) -> None:
+        if items:
+            console.print(f"  {label}: {len(items)}")
+
+    _list("Duplicate titles", crawl.duplicate_titles)
+    _list("Duplicate meta descriptions", crawl.duplicate_descriptions)
+    _list("Missing H1", crawl.missing_h1)
+    _list("Duplicate H1", crawl.duplicate_h1_pages)
+    _list("Heading order issues", crawl.heading_order_issues)
+    _list("Thin content pages", crawl.thin_content)
+    _list("Canonical issues", crawl.canonical_issues)
+    _list("Redirect chains", crawl.redirect_chains)
+    _list("Error pages (4xx/5xx)", crawl.error_pages)
+    _list("Orphan pages (in sitemap, not linked)", crawl.orphan_pages)
+    _list("Pages deeper than 3 clicks", crawl.deep_pages)
+    _list("Crawled pages missing from sitemap", crawl.missing_from_sitemap)
+
+
 def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
     """Render ``report`` as terminal text; ``color=False`` yields plain text (e.g. for a file)."""
     buffer = io.StringIO()
@@ -109,5 +143,8 @@ def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
 
     if report.vitals is not None:
         _print_vitals(console, report.vitals)
+
+    if report.site_crawl is not None:
+        _print_site_crawl(console, report.site_crawl)
 
     return buffer.getvalue()

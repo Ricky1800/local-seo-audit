@@ -214,3 +214,38 @@ def test_vitals_true_fetches_core_web_vitals(respx_mock: respx.MockRouter) -> No
     assert report.vitals is not None
     assert report.vitals.mobile is not None
     assert report.vitals.mobile.error is not None  # fixture has no usable field/lab data
+
+
+def test_site_defaults_to_none(respx_mock: respx.MockRouter) -> None:
+    html = "<html></html>"
+    respx_mock.get("https://nosite.example/").mock(return_value=httpx.Response(200, text=html))
+    respx_mock.get("http://nosite.example/").mock(
+        return_value=httpx.Response(301, headers={"Location": "https://nosite.example/"})
+    )
+    respx_mock.get("https://nosite.example/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://nosite.example/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://nosite.example/favicon.ico").mock(return_value=httpx.Response(404))
+
+    report = audit("https://nosite.example/")
+
+    assert report.site_crawl is None
+
+
+def test_site_true_runs_a_full_crawl(respx_mock: respx.MockRouter) -> None:
+    origin = "https://fullsite.example"
+    html = '<html><body><a href="/about">About</a></body></html>'
+    about_html = "<html><body><h1>About</h1></body></html>"
+    respx_mock.get(f"{origin}/").mock(return_value=httpx.Response(200, text=html))
+    respx_mock.get(f"http://{origin.removeprefix('https://')}/").mock(
+        return_value=httpx.Response(301, headers={"Location": f"{origin}/"})
+    )
+    respx_mock.get(f"{origin}/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/favicon.ico").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/about").mock(return_value=httpx.Response(200, text=about_html))
+
+    report = audit(f"{origin}/", site=True, max_pages=5)
+
+    assert report.site_crawl is not None
+    assert report.site_crawl.pages_crawled == 2
+    assert report.site_crawl.max_pages == 5

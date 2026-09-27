@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import Enum
 
 from local_seo_audit.business import Business
+from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.vitals import VitalsResult
 
 
@@ -105,6 +106,8 @@ class Report:
     tool_version: str = "0.1.0"
     #: Populated only when ``--vitals`` (or ``audit(..., vitals=True)``) was requested.
     vitals: VitalsResult | None = None
+    #: Populated only when ``--site`` (or ``audit(..., site=True)``) was requested.
+    site_crawl: SiteCrawlReport | None = None
 
     @property
     def score(self) -> float:

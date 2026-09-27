@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 from local_seo_audit.business import Business
 from local_seo_audit.checks import ALL_CHECKS, AuditContext, CrawlLinkStatus, CrawlResult
+from local_seo_audit.crawler import DEFAULT_MAX_PAGES, SiteCrawlReport, crawl_site
 from local_seo_audit.fetcher import FetchResult, fetch, new_client
 from local_seo_audit.models import Report
 from local_seo_audit.utils import ensure_scheme, same_host
@@ -80,6 +81,8 @@ def audit(
     client: httpx.Client | None = None,
     vitals: bool = False,
     psi_api_key: str | None = None,
+    site: bool = False,
+    max_pages: int = DEFAULT_MAX_PAGES,
 ) -> Report:
     """Audit ``url`` and return a fully-scored :class:`Report`.
 
@@ -98,6 +101,9 @@ def audit(
         psi_api_key: Optional PageSpeed Insights API key. Falls back to the
             ``PSI_API_KEY`` environment variable, then to an unauthenticated
             (rate-limited) request.
+        site: If true, also crawl the whole site (same host, breadth-first,
+            respecting robots.txt) looking for site-level SEO problems.
+        max_pages: With ``site=True``, stop after visiting this many pages.
     """
     business = business or Business()
     target = ensure_scheme(url.strip())
@@ -142,6 +148,10 @@ def audit(
         if vitals:
             vitals_result = fetch_core_web_vitals(ctx.page_url, api_key=psi_api_key)
 
+        site_crawl_result: SiteCrawlReport | None = None
+        if site and primary.ok:
+            site_crawl_result = crawl_site(http_client, base_for_relative, max_pages=max_pages)
+
         return Report(
             url=target,
             final_url=primary.final_url or target,
@@ -149,6 +159,7 @@ def audit(
             results=results,
             generated_at=ctx.fetched_at,
             vitals=vitals_result,
+            site_crawl=site_crawl_result,
         )
     finally:
         if owns_client:

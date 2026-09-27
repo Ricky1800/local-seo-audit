@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from local_seo_audit.crawler import CrawledPage, SiteCrawlReport
 from local_seo_audit.models import Report
 from local_seo_audit.vitals import LabData, Metric, StrategyResult, VitalsResult
 
@@ -60,6 +61,59 @@ def _vitals_to_dict(vitals: VitalsResult | None) -> dict[str, Any] | None:
     }
 
 
+def _page_to_dict(page: CrawledPage) -> dict[str, Any]:
+    return {
+        "url": page.url,
+        "status_code": page.status_code,
+        "ok": page.ok,
+        "error": page.error,
+        "redirected": page.redirected,
+        "history_urls": list(page.history_urls),
+        "title": page.title,
+        "meta_description": page.meta_description,
+        "h1_count": page.h1_count,
+        "word_count": page.word_count,
+        "canonical": page.canonical,
+        "noindex": page.noindex,
+        "depth": page.depth,
+        "in_sitemap": page.in_sitemap,
+        "has_tel_link": page.has_tel_link,
+        "has_json_ld": page.has_json_ld,
+    }
+
+
+def _site_crawl_to_dict(crawl: SiteCrawlReport | None) -> dict[str, Any] | None:
+    if crawl is None:
+        return None
+    return {
+        "start_url": crawl.start_url,
+        "max_pages": crawl.max_pages,
+        "pages_crawled": crawl.pages_crawled,
+        "sitemap_url_count": len(crawl.sitemap_urls),
+        "robots_disallowed": list(crawl.robots_disallowed),
+        "pages": [_page_to_dict(p) for p in sorted(crawl.pages, key=lambda p: p.url)],
+        "issues": {
+            "duplicate_titles": [
+                {"value": t, "urls": list(urls)} for t, urls in crawl.duplicate_titles
+            ],
+            "duplicate_descriptions": [
+                {"value": d, "urls": list(urls)} for d, urls in crawl.duplicate_descriptions
+            ],
+            "missing_h1": list(crawl.missing_h1),
+            "duplicate_h1": list(crawl.duplicate_h1_pages),
+            "heading_order_issues": list(crawl.heading_order_issues),
+            "thin_content": [{"url": u, "word_count": n} for u, n in crawl.thin_content],
+            "canonical_issues": list(crawl.canonical_issues),
+            "redirect_chains": list(crawl.redirect_chains),
+            "error_pages": [{"url": u, "status_code": s} for u, s in crawl.error_pages],
+            "orphan_pages": list(crawl.orphan_pages),
+            "deep_pages": [{"url": u, "depth": d} for u, d in crawl.deep_pages],
+            "missing_from_sitemap": list(crawl.missing_from_sitemap),
+            "noindex_pages": list(crawl.noindex_pages),
+        },
+    }
+
+
 def report_to_dict(report: Report) -> dict[str, Any]:
     """A plain, JSON-serializable representation of ``report``."""
     return {
@@ -89,6 +143,7 @@ def report_to_dict(report: Report) -> dict[str, Any]:
             for r in report.sorted_results
         ],
         "vitals": _vitals_to_dict(report.vitals),
+        "site_crawl": _site_crawl_to_dict(report.site_crawl),
     }
 
 

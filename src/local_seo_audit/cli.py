@@ -10,6 +10,7 @@ from pathlib import Path
 from local_seo_audit import __version__
 from local_seo_audit.business import Business
 from local_seo_audit.core import audit
+from local_seo_audit.crawler import DEFAULT_MAX_PAGES
 from local_seo_audit.render import Format, render
 
 
@@ -53,6 +54,18 @@ def build_parser() -> argparse.ArgumentParser:
             "Off by default: slow, and calls a third-party API. Uses PSI_API_KEY if set."
         ),
     )
+    parser.add_argument(
+        "--site",
+        action="store_true",
+        help="Crawl the whole site (same host, respecting robots.txt) for site-level SEO issues.",
+    )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=DEFAULT_MAX_PAGES,
+        metavar="N",
+        help=f"With --site, stop after visiting N pages (default {DEFAULT_MAX_PAGES}).",
+    )
     parser.add_argument("--version", action="version", version=f"local-seo-audit {__version__}")
     return parser
 
@@ -78,7 +91,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     business = Business(name=args.name, phone=args.phone, city=args.city, address=args.address)
 
     try:
-        report = audit(args.url, business=business, crawl=max(args.crawl, 0), vitals=args.vitals)
+        report = audit(
+            args.url,
+            business=business,
+            crawl=max(args.crawl, 0),
+            vitals=args.vitals,
+            site=args.site,
+            max_pages=args.max_pages,
+        )
     except Exception as exc:  # pragma: no cover - audit() itself does not raise in practice
         print(f"local-seo-audit: error auditing {args.url}: {exc}", file=sys.stderr)
         return 1

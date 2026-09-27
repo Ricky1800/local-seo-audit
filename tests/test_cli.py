@@ -117,6 +117,17 @@ def test_vitals_flag_is_parsed(respx_mock: respx.MockRouter, good_site_html: str
     assert exit_code == 0
 
 
+def test_site_and_max_pages_flags_are_parsed(
+    respx_mock: respx.MockRouter, good_site_html: str
+) -> None:
+    origin = "https://www.joesplumbingnj.com"
+    _mock_simple_site(respx_mock, origin, good_site_html)
+
+    exit_code = main([f"{origin}/", "--site", "--max-pages", "2", "--format", "json"])
+
+    assert exit_code == 0
+
+
 def test_network_failure_returns_exit_code_one(
     respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
