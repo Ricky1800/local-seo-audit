@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from local_seo_audit.compare import CompetitorComparison
 from local_seo_audit.crawler import CrawledPage, SiteCrawlReport
 from local_seo_audit.models import Report
 from local_seo_audit.vitals import LabData, Metric, StrategyResult, VitalsResult
@@ -114,6 +115,51 @@ def _site_crawl_to_dict(crawl: SiteCrawlReport | None) -> dict[str, Any] | None:
     }
 
 
+def _compare_to_dict(comparison: CompetitorComparison | None) -> dict[str, Any] | None:
+    if comparison is None:
+        return None
+    return {
+        "your_url": comparison.your_url,
+        "competitors": [
+            {
+                "url": entry.url,
+                "ok": entry.ok,
+                "error": entry.error,
+                "score": entry.report.score if entry.report else None,
+                "grade": entry.report.grade if entry.report else None,
+                "metrics": (
+                    {
+                        "page_weight_bytes": entry.metrics.page_weight_bytes,
+                        "schema_types": list(entry.metrics.schema_types),
+                    }
+                    if entry.metrics is not None
+                    else None
+                ),
+            }
+            for entry in comparison.competitors
+        ],
+        "matrix": [
+            {
+                "check_id": row.check_id,
+                "title": row.title,
+                "weight": row.weight,
+                "your_status": row.your_status,
+                "competitor_statuses": list(row.competitor_statuses),
+            }
+            for row in comparison.matrix
+        ],
+        "gaps": [
+            {
+                "check_id": gap.check_id,
+                "title": gap.title,
+                "weight": gap.weight,
+                "ahead_competitors": list(gap.ahead_competitors),
+            }
+            for gap in comparison.gaps
+        ],
+    }
+
+
 def report_to_dict(report: Report) -> dict[str, Any]:
     """A plain, JSON-serializable representation of ``report``."""
     return {
@@ -144,6 +190,7 @@ def report_to_dict(report: Report) -> dict[str, Any]:
         ],
         "vitals": _vitals_to_dict(report.vitals),
         "site_crawl": _site_crawl_to_dict(report.site_crawl),
+        "competitors": _compare_to_dict(report.competitors),
     }
 
 

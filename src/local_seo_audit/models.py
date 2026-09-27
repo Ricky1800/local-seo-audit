@@ -5,10 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from local_seo_audit.business import Business
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.vitals import VitalsResult
+
+if TYPE_CHECKING:
+    from local_seo_audit.compare import CompetitorComparison
 
 
 class Status(str, Enum):
@@ -108,6 +112,9 @@ class Report:
     vitals: VitalsResult | None = None
     #: Populated only when ``--site`` (or ``audit(..., site=True)``) was requested.
     site_crawl: SiteCrawlReport | None = None
+    #: Populated only when ``--compare URL`` was given (attached after the fact via
+    #: ``dataclasses.replace``, since it depends on a completed ``Report``).
+    competitors: CompetitorComparison | None = None
 
     @property
     def score(self) -> float:

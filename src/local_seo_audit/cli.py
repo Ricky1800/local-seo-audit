@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 from local_seo_audit import __version__
 from local_seo_audit.business import Business
+from local_seo_audit.compare import MAX_COMPETITORS, compare_competitors
 from local_seo_audit.core import audit
 from local_seo_audit.crawler import DEFAULT_MAX_PAGES
 from local_seo_audit.render import Format, render
@@ -66,6 +68,17 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help=f"With --site, stop after visiting N pages (default {DEFAULT_MAX_PAGES}).",
     )
+    parser.add_argument(
+        "--compare",
+        action="append",
+        default=None,
+        metavar="URL",
+        dest="compare",
+        help=(
+            "Audit a competitor URL and compare it side-by-side with the same checks. "
+            f"Repeatable, up to {MAX_COMPETITORS} times."
+        ),
+    )
     parser.add_argument("--version", action="version", version=f"local-seo-audit {__version__}")
     return parser
 
@@ -102,6 +115,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as exc:  # pragma: no cover - audit() itself does not raise in practice
         print(f"local-seo-audit: error auditing {args.url}: {exc}", file=sys.stderr)
         return 1
+
+    if args.compare:
+        try:
+            comparison = compare_competitors(
+                report, args.compare, business=business, vitals=args.vitals
+            )
+        except ValueError as exc:
+            print(f"local-seo-audit: {exc}", file=sys.stderr)
+            return 2
+        report = dataclasses.replace(report, competitors=comparison)
 
     fmt: Format = args.format
     color = args.out is None and fmt == "text"

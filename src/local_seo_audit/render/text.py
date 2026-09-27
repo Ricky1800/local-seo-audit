@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from rich.console import Console
 
+from local_seo_audit.compare import CompetitorComparison
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
@@ -104,6 +105,27 @@ def _print_site_crawl(console: Console, crawl: SiteCrawlReport) -> None:
     _list("Crawled pages missing from sitemap", crawl.missing_from_sitemap)
 
 
+def _print_compare(console: Console, comparison: CompetitorComparison) -> None:
+    console.print("")
+    console.print("[bold]Competitor compare[/bold]")
+    header = "  Check".ljust(46) + "You".ljust(10)
+    header += "".join(entry.url.ljust(24) for entry in comparison.competitors)
+    console.print(header)
+    for row in comparison.matrix:
+        line = f"  {row.title[:44]}".ljust(46)
+        line += (row.your_status or "-").ljust(10)
+        line += "".join((status or "-").ljust(24) for status in row.competitor_statuses)
+        console.print(line)
+
+    console.print("")
+    console.print("[bold]Gaps[/bold] (they have it, you don't - ranked by impact):")
+    if not comparison.gaps:
+        console.print("  None found.")
+    for gap in comparison.gaps:
+        who = ", ".join(gap.ahead_competitors)
+        console.print(f"  - {gap.title} (weight {gap.weight}) - ahead: {who}")
+
+
 def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
     """Render ``report`` as terminal text; ``color=False`` yields plain text (e.g. for a file)."""
     buffer = io.StringIO()
@@ -146,5 +168,8 @@ def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
 
     if report.site_crawl is not None:
         _print_site_crawl(console, report.site_crawl)
+
+    if report.competitors is not None:
+        _print_compare(console, report.competitors)
 
     return buffer.getvalue()

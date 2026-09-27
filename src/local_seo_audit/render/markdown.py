@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from local_seo_audit.compare import CompetitorComparison
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
@@ -49,6 +50,27 @@ def _vitals_lines(vitals: VitalsResult) -> list[str]:
                 for opportunity in lab.opportunities:
                     lines.append(f"  - {opportunity}")
         lines.append("")
+    return lines
+
+
+def _compare_lines(comparison: CompetitorComparison) -> list[str]:
+    lines = ["## Competitor compare", ""]
+    header = ["Check", "You"] + [entry.url for entry in comparison.competitors]
+    lines.append("| " + " | ".join(header) + " |")
+    lines.append("|" + "---|" * len(header))
+    for row in comparison.matrix:
+        cells = [row.title, row.your_status or "-"]
+        cells.extend(status or "-" for status in row.competitor_statuses)
+        lines.append("| " + " | ".join(cells) + " |")
+    lines.append("")
+    lines.append("### Gaps (they have it, you don't - ranked by impact)")
+    lines.append("")
+    if not comparison.gaps:
+        lines.append("None found.")
+    for gap in comparison.gaps:
+        who = ", ".join(gap.ahead_competitors)
+        lines.append(f"- **{gap.title}** (weight {gap.weight}) - ahead: {who}")
+    lines.append("")
     return lines
 
 
@@ -123,5 +145,8 @@ def render_markdown(report: Report) -> str:
 
     if report.site_crawl is not None:
         lines.extend(_site_crawl_lines(report.site_crawl))
+
+    if report.competitors is not None:
+        lines.extend(_compare_lines(report.competitors))
 
     return "\n".join(lines).rstrip() + "\n"

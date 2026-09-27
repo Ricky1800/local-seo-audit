@@ -128,6 +128,48 @@ def test_site_and_max_pages_flags_are_parsed(
     assert exit_code == 0
 
 
+def test_compare_flag_adds_competitors_to_the_report(
+    respx_mock: respx.MockRouter, good_site_html: str, bad_site_html: str
+) -> None:
+    origin = "https://www.joesplumbingnj.com"
+    _mock_simple_site(respx_mock, origin, good_site_html)
+
+    competitor_origin = "http://competitor.example"
+    respx_mock.get(f"{competitor_origin}/").mock(
+        return_value=httpx.Response(200, text=bad_site_html)
+    )
+    respx_mock.get(f"{competitor_origin}/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{competitor_origin}/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{competitor_origin}/favicon.ico").mock(return_value=httpx.Response(404))
+
+    exit_code = main([f"{origin}/", "--compare", f"{competitor_origin}/", "--format", "json"])
+
+    assert exit_code == 0
+
+
+def test_compare_flag_rejects_too_many_urls(
+    respx_mock: respx.MockRouter, good_site_html: str
+) -> None:
+    origin = "https://www.joesplumbingnj.com"
+    _mock_simple_site(respx_mock, origin, good_site_html)
+
+    exit_code = main(
+        [
+            f"{origin}/",
+            "--compare",
+            "https://c1.example/",
+            "--compare",
+            "https://c2.example/",
+            "--compare",
+            "https://c3.example/",
+            "--compare",
+            "https://c4.example/",
+        ]
+    )
+
+    assert exit_code == 2
+
+
 def test_network_failure_returns_exit_code_one(
     respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
