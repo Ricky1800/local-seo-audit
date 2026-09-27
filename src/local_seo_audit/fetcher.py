@@ -11,7 +11,7 @@ import httpx
 try:
     _VERSION = version("local-seo-audit")
 except PackageNotFoundError:  # pragma: no cover - only hit when not installed
-    _VERSION = "0.1.0"
+    _VERSION = "0.2.0"
 
 #: Sent on every request so site owners can see who is auditing them and why.
 USER_AGENT = f"local-seo-audit/{_VERSION} (+https://github.com/Ricky1800/local-seo-audit)"

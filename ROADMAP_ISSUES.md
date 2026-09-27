@@ -3,7 +3,13 @@
 Well-scoped, unimplemented ideas for `local-seo-audit`. Each is written so
 it could be copy-pasted directly into a new GitHub issue. Nothing below is
 implemented — see [CHANGELOG.md](CHANGELOG.md) for what actually ships in
-v0.1.0.
+each release.
+
+> Note: a Core Web Vitals check was originally scoped here (issue 7, in
+> v0.1.0) as a headless-browser-based `--perf` check. It shipped in v0.2.0
+> as `--vitals` instead, using Google's free PageSpeed Insights API — no
+> headless browser dependency needed. See the README's
+> [Core Web Vitals](README.md#core-web-vitals---vitals) section.
 
 ---
 
@@ -147,32 +153,7 @@ more shapes worth handling.
 
 ---
 
-## 7. Core Web Vitals / real-page-speed check (optional, headless-browser based)
-
-**Labels:** `help wanted`, `enhancement`, `larger effort`
-
-**Body:**
-
-`page_weight` is a cheap proxy for page speed (HTML size, script/style
-counts) but doesn't measure actual load performance. A real Core Web Vitals
-check (LCP/CLS/INP) would need a headless browser, which is a much heavier
-dependency than the rest of this tool and would meaningfully slow down a
-run — so it should be strictly optional.
-
-**Acceptance criteria:**
-- New optional dependency group `perf` (e.g. `playwright`).
-- New check only registered/run when `--perf` is passed AND the extra is
-  installed; otherwise it's skipped with a clear message pointing at the
-  install command (never a hard failure).
-- Reports LCP, CLS, and INP (or documents why a subset isn't feasible)
-  with pass/warn/fail thresholds matching Google's published Core Web
-  Vitals thresholds.
-- CI does not need to install the `perf` extra; document that this check is
-  untested in the default CI matrix and why.
-
----
-
-## 8. Localized/non-English LocalBusiness support
+## 7. Localized/non-English LocalBusiness support
 
 **Labels:** `help wanted`, `enhancement`
 

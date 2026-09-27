@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "local-seo-audit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Audit a local business website for local-SEO and conversion basics, and print a prioritized, plain-English fix list."
 readme = "README.md"
 requires-python = ">=3.10"

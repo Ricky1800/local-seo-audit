@@ -12,7 +12,7 @@ from local_seo_audit.business import Business
 from local_seo_audit.core import audit
 from local_seo_audit.models import CheckResult, Report, Severity, Status
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "Business",

@@ -108,7 +108,7 @@ class Report:
     business: Business
     results: list[CheckResult] = field(default_factory=list)
     generated_at: datetime = field(default_factory=datetime.now)
-    tool_version: str = "0.1.0"
+    tool_version: str = "0.2.0"
     #: Populated only when ``--vitals`` (or ``audit(..., vitals=True)``) was requested.
     vitals: VitalsResult | None = None
     #: Populated only when ``--site`` (or ``audit(..., site=True)``) was requested.
