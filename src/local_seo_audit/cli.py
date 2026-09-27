@@ -79,8 +79,33 @@ def build_parser() -> argparse.ArgumentParser:
             f"Repeatable, up to {MAX_COMPETITORS} times."
         ),
     )
+    parser.add_argument(
+        "--services",
+        default=None,
+        metavar="LIST",
+        help=(
+            "Comma-separated services to check for a dedicated page, e.g. "
+            '"drain cleaning,water heater". Inferred from nav/headings if omitted.'
+        ),
+    )
+    parser.add_argument(
+        "--areas",
+        default=None,
+        metavar="LIST",
+        help=(
+            "Comma-separated city/service-area names to check for a dedicated page, "
+            'e.g. "Princeton,Plainsboro".'
+        ),
+    )
     parser.add_argument("--version", action="version", version=f"local-seo-audit {__version__}")
     return parser
+
+
+def _parse_csv_list(value: str | None) -> list[str] | None:
+    if value is None:
+        return None
+    items = [item.strip() for item in value.split(",")]
+    return [item for item in items if item] or None
 
 
 def _ensure_utf8_stdio() -> None:
@@ -111,6 +136,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             vitals=args.vitals,
             site=args.site,
             max_pages=args.max_pages,
+            services=_parse_csv_list(args.services),
+            areas=_parse_csv_list(args.areas),
         )
     except Exception as exc:  # pragma: no cover - audit() itself does not raise in practice
         print(f"local-seo-audit: error auditing {args.url}: {exc}", file=sys.stderr)

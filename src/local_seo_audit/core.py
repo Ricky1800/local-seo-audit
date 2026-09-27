@@ -10,7 +10,14 @@ from bs4 import BeautifulSoup
 
 from local_seo_audit.business import Business
 from local_seo_audit.checks import ALL_CHECKS, AuditContext, CrawlLinkStatus, CrawlResult
-from local_seo_audit.crawler import DEFAULT_MAX_PAGES, SiteCrawlReport, crawl_site
+from local_seo_audit.content_gaps import ContentGapPlan, analyze_content_gaps
+from local_seo_audit.crawler import (
+    DEFAULT_MAX_PAGES,
+    CrawledPage,
+    SiteCrawlReport,
+    build_single_page_snapshot,
+    crawl_site,
+)
 from local_seo_audit.fetcher import FetchResult, fetch, new_client
 from local_seo_audit.models import Report
 from local_seo_audit.utils import ensure_scheme, same_host
@@ -83,6 +90,8 @@ def audit(
     psi_api_key: str | None = None,
     site: bool = False,
     max_pages: int = DEFAULT_MAX_PAGES,
+    services: list[str] | None = None,
+    areas: list[str] | None = None,
 ) -> Report:
     """Audit ``url`` and return a fully-scored :class:`Report`.
 
@@ -104,6 +113,12 @@ def audit(
         site: If true, also crawl the whole site (same host, breadth-first,
             respecting robots.txt) looking for site-level SEO problems.
         max_pages: With ``site=True``, stop after visiting this many pages.
+        services: Service names to check for a dedicated landing page (local
+            content-gap analysis). Runs automatically whenever ``site=True``;
+            passing this without ``site=True`` still runs a lighter,
+            homepage-only version of the analysis.
+        areas: City/service-area names to check for a dedicated page. Same
+            homepage-only fallback as ``services`` when ``site=False``.
     """
     business = business or Business()
     target = ensure_scheme(url.strip())
@@ -152,6 +167,18 @@ def audit(
         if site and primary.ok:
             site_crawl_result = crawl_site(http_client, base_for_relative, max_pages=max_pages)
 
+        content_plan_result: ContentGapPlan | None = None
+        if site_crawl_result is not None or services or areas:
+            pages: list[CrawledPage] = (
+                list(site_crawl_result.pages)
+                if site_crawl_result is not None
+                else ([build_single_page_snapshot(primary, ctx.page_url)] if primary.ok else [])
+            )
+            if pages:
+                content_plan_result = analyze_content_gaps(
+                    pages, business=business, services=services, areas=areas
+                )
+
         return Report(
             url=target,
             final_url=primary.final_url or target,
@@ -160,6 +187,7 @@ def audit(
             generated_at=ctx.fetched_at,
             vitals=vitals_result,
             site_crawl=site_crawl_result,
+            content_plan=content_plan_result,
         )
     finally:
         if owns_client:

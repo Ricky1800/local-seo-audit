@@ -24,7 +24,8 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 
 from local_seo_audit.fetcher import FetchResult, fetch
-from local_seo_audit.utils import same_host
+from local_seo_audit.structured_data import has_schema_type
+from local_seo_audit.utils import normalize_phone, same_host
 
 #: Matches the CLI default and keeps a run bounded even for a large site.
 DEFAULT_MAX_PAGES = 50
@@ -37,6 +38,9 @@ MAX_HEALTHY_DEPTH = 3
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
 _SKIP_LINK_PREFIXES = ("#", "mailto:", "tel:", "javascript:")
+_PHONE_TOKEN_RE = re.compile(r"[\d()+.\-\s]{7,}")
+MAP_EMBED_MARKERS = ("google.com/maps", "maps.google.")
+GBP_LINK_MARKERS = ("g.page/", "business.google.com/", "goo.gl/maps", "maps.app.goo.gl")
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +73,17 @@ class CrawledPage:
     in_sitemap: bool
     has_tel_link: bool
     has_json_ld: bool
+    #: Visible, whitespace-normalized text - kept for cross-page NAP-consistency checks.
+    page_text: str = ""
+    #: Every distinct normalized (digits-only) phone number found in the page's text.
+    phone_candidates: tuple[str, ...] = ()
+    has_review_schema: bool = False
+    has_faq_schema: bool = False
+    has_map_embed: bool = False
+    has_gbp_link: bool = False
+    #: Short (<=6 word) anchor texts, from a <nav> if present else all links - candidate
+    #: service names when --services isn't given.
+    nav_link_texts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,6 +245,38 @@ def _tag_content(tag: object) -> str | None:
     return content.strip() if isinstance(content, str) and content.strip() else None
 
 
+def _extract_phone_candidates(text: str) -> set[str]:
+    out: set[str] = set()
+    for token in _PHONE_TOKEN_RE.findall(text):
+        normalized = normalize_phone(token)
+        if len(normalized) >= 10:
+            out.add(normalized)
+    return out
+
+
+def _has_marker(urls: list[str], markers: tuple[str, ...]) -> bool:
+    return any(marker in url.lower() for url in urls for marker in markers)
+
+
+def _extract_nav_link_texts(soup: BeautifulSoup, limit: int = 20) -> list[str]:
+    nav = soup.find("nav")
+    anchors = nav.find_all("a") if isinstance(nav, Tag) else soup.find_all("a")
+    out: list[str] = []
+    seen: set[str] = set()
+    for a in anchors:
+        text = a.get_text(strip=True)
+        if not text or text.lower() in seen:
+            continue
+        word_count = len(text.split())
+        if not (1 <= word_count <= 6):
+            continue
+        seen.add(text.lower())
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def _build_crawled_page(
     result: FetchResult, url: str, depth: int, sitemap_urls: set[str]
 ) -> CrawledPage:
@@ -293,6 +340,13 @@ def _build_crawled_page(
         for a in soup.find_all("a", href=True)
     )
     has_json_ld = bool(soup.find_all("script", attrs={"type": "application/ld+json"}))
+    has_review_schema = has_schema_type(soup, "AggregateRating", "Review")
+    has_faq_schema = has_schema_type(soup, "FAQPage")
+
+    link_hrefs = [a.get("href", "") for a in soup.find_all("a", href=True)]
+    iframe_srcs = [f.get("src", "") for f in soup.find_all("iframe", src=True)]
+    has_map_embed = _has_marker(link_hrefs + iframe_srcs, MAP_EMBED_MARKERS)
+    has_gbp_link = _has_marker(link_hrefs, GBP_LINK_MARKERS)
 
     base_for_links = result.final_url or url
     internal_links = frozenset(_extract_links(soup, base_for_links))
@@ -316,6 +370,13 @@ def _build_crawled_page(
         in_sitemap=in_sitemap,
         has_tel_link=has_tel_link,
         has_json_ld=has_json_ld,
+        page_text=page_text,
+        phone_candidates=tuple(sorted(_extract_phone_candidates(page_text))),
+        has_review_schema=has_review_schema,
+        has_faq_schema=has_faq_schema,
+        has_map_embed=has_map_embed,
+        has_gbp_link=has_gbp_link,
+        nav_link_texts=tuple(_extract_nav_link_texts(soup)),
     )
 
 
@@ -398,6 +459,16 @@ def _build_report(
         missing_from_sitemap=missing_from_sitemap,
         noindex_pages=noindex_pages,
     )
+
+
+def build_single_page_snapshot(result: FetchResult, url: str) -> CrawledPage:
+    """Build a :class:`CrawledPage` from just one already-fetched page.
+
+    Used as a lighter fallback for content-gap analysis when ``--site`` wasn't
+    requested: less signal (only the homepage), but still real data rather
+    than skipping the feature outright.
+    """
+    return _build_crawled_page(result, url, depth=0, sitemap_urls=set())
 
 
 def crawl_site(

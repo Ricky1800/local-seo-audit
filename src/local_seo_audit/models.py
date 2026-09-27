@@ -8,6 +8,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from local_seo_audit.business import Business
+from local_seo_audit.content_gaps import ContentGapPlan
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.vitals import VitalsResult
 
@@ -115,6 +116,8 @@ class Report:
     #: Populated only when ``--compare URL`` was given (attached after the fact via
     #: ``dataclasses.replace``, since it depends on a completed ``Report``).
     competitors: CompetitorComparison | None = None
+    #: Populated when a site crawl ran (--site) or --services/--areas was given.
+    content_plan: ContentGapPlan | None = None
 
     @property
     def score(self) -> float:

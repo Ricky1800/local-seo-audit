@@ -8,7 +8,14 @@ import pytest
 import respx
 
 from local_seo_audit import __version__
-from local_seo_audit.cli import main
+from local_seo_audit.cli import _parse_csv_list, main
+
+
+def test_parse_csv_list() -> None:
+    assert _parse_csv_list(None) is None
+    assert _parse_csv_list("") is None
+    assert _parse_csv_list(" , , ") is None
+    assert _parse_csv_list("drain cleaning, water heater ,") == ["drain cleaning", "water heater"]
 
 
 def _mock_simple_site(respx_mock: respx.MockRouter, origin: str, html: str) -> None:
@@ -168,6 +175,27 @@ def test_compare_flag_rejects_too_many_urls(
     )
 
     assert exit_code == 2
+
+
+def test_services_and_areas_flags_are_parsed(
+    respx_mock: respx.MockRouter, good_site_html: str
+) -> None:
+    origin = "https://www.joesplumbingnj.com"
+    _mock_simple_site(respx_mock, origin, good_site_html)
+
+    exit_code = main(
+        [
+            f"{origin}/",
+            "--services",
+            "drain cleaning, water heater",
+            "--areas",
+            "Princeton,Plainsboro",
+            "--format",
+            "json",
+        ]
+    )
+
+    assert exit_code == 0
 
 
 def test_network_failure_returns_exit_code_one(

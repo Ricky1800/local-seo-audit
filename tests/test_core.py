@@ -249,3 +249,42 @@ def test_site_true_runs_a_full_crawl(respx_mock: respx.MockRouter) -> None:
     assert report.site_crawl is not None
     assert report.site_crawl.pages_crawled == 2
     assert report.site_crawl.max_pages == 5
+    # A --site crawl automatically feeds the content-gap analysis.
+    assert report.content_plan is not None
+
+
+def test_content_plan_defaults_to_none_without_site_or_services(
+    respx_mock: respx.MockRouter,
+) -> None:
+    html = "<html></html>"
+    respx_mock.get("https://noplan.example/").mock(return_value=httpx.Response(200, text=html))
+    respx_mock.get("http://noplan.example/").mock(
+        return_value=httpx.Response(301, headers={"Location": "https://noplan.example/"})
+    )
+    respx_mock.get("https://noplan.example/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://noplan.example/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://noplan.example/favicon.ico").mock(return_value=httpx.Response(404))
+
+    report = audit("https://noplan.example/")
+
+    assert report.content_plan is None
+
+
+def test_services_flag_runs_a_homepage_only_content_plan_without_site(
+    respx_mock: respx.MockRouter, good_site_html: str
+) -> None:
+    origin = "https://serviceflag.example"
+    respx_mock.get(f"{origin}/").mock(return_value=httpx.Response(200, text=good_site_html))
+    respx_mock.get(f"http://{origin.removeprefix('https://')}/").mock(
+        return_value=httpx.Response(301, headers={"Location": f"{origin}/"})
+    )
+    respx_mock.get(f"{origin}/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/favicon.ico").mock(return_value=httpx.Response(404))
+
+    report = audit(f"{origin}/", services=["drain cleaning"], areas=["Princeton"])
+
+    assert report.site_crawl is None
+    assert report.content_plan is not None
+    assert report.content_plan.services[0].query == "drain cleaning"
+    assert not report.content_plan.inferred_services

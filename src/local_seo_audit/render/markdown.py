@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from local_seo_audit.compare import CompetitorComparison
+from local_seo_audit.content_gaps import ContentGapPlan
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
@@ -70,6 +71,49 @@ def _compare_lines(comparison: CompetitorComparison) -> list[str]:
     for gap in comparison.gaps:
         who = ", ".join(gap.ahead_competitors)
         lines.append(f"- **{gap.title}** (weight {gap.weight}) - ahead: {who}")
+    lines.append("")
+    return lines
+
+
+def _content_plan_lines(plan: ContentGapPlan) -> list[str]:
+    lines = ["## Local content gaps", ""]
+    label = "inferred from nav/headings" if plan.inferred_services else "as requested"
+    lines.append(f"**Services checked** ({label}):")
+    for status in plan.services:
+        mark = "found" if status.found else "MISSING"
+        suffix = f" ({status.matched_url})" if status.matched_url else ""
+        lines.append(f"- [{mark}] {status.query}{suffix}")
+    lines.append("")
+    if plan.areas:
+        lines.append("**Areas checked:**")
+        for status in plan.areas:
+            mark = "found" if status.found else "MISSING"
+            lines.append(f"- [{mark}] {status.query}")
+        lines.append("")
+    lines.append(
+        f"- **NAP:** {len(plan.nap.distinct_phone_numbers)} distinct phone number(s) across "
+        f"{plan.nap.pages_checked} page(s); consistent: {plan.nap.phone_consistent}."
+    )
+    covered = plan.click_to_call.pages_checked - len(plan.click_to_call.pages_missing)
+    lines.append(
+        f"- **Click-to-call:** {covered}/{plan.click_to_call.pages_checked} page(s) have a "
+        "tel: link."
+    )
+    lines.append(
+        f"- **Review/AggregateRating schema:** {plan.schema.has_review_schema_anywhere}. "
+        f"**FAQPage schema:** {plan.schema.has_faq_schema_anywhere}."
+    )
+    lines.append(
+        f"- **Google Business Profile link:** {plan.has_gbp_link}. "
+        f"**Contact page map:** {plan.has_contact_page_map}."
+    )
+    lines.append("")
+    lines.append("### Content to create (prioritized)")
+    lines.append("")
+    if not plan.plan:
+        lines.append("Nothing found - great coverage.")
+    for item in plan.plan:
+        lines.append(f"- **[{item.priority.upper()}] {item.title}** - {item.why}")
     lines.append("")
     return lines
 
@@ -148,5 +192,8 @@ def render_markdown(report: Report) -> str:
 
     if report.competitors is not None:
         lines.extend(_compare_lines(report.competitors))
+
+    if report.content_plan is not None:
+        lines.extend(_content_plan_lines(report.content_plan))
 
     return "\n".join(lines).rstrip() + "\n"

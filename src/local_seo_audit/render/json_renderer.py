@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from local_seo_audit.compare import CompetitorComparison
+from local_seo_audit.content_gaps import ContentGapPlan
 from local_seo_audit.crawler import CrawledPage, SiteCrawlReport
 from local_seo_audit.models import Report
 from local_seo_audit.vitals import LabData, Metric, StrategyResult, VitalsResult
@@ -160,6 +161,49 @@ def _compare_to_dict(comparison: CompetitorComparison | None) -> dict[str, Any] 
     }
 
 
+def _content_plan_to_dict(plan: ContentGapPlan | None) -> dict[str, Any] | None:
+    if plan is None:
+        return None
+    return {
+        "services": [
+            {"query": s.query, "found": s.found, "matched_url": s.matched_url}
+            for s in plan.services
+        ],
+        "areas": [
+            {"query": a.query, "found": a.found, "matched_url": a.matched_url} for a in plan.areas
+        ],
+        "inferred_services": plan.inferred_services,
+        "nap": {
+            "pages_checked": plan.nap.pages_checked,
+            "distinct_phone_numbers": list(plan.nap.distinct_phone_numbers),
+            "phone_consistent": plan.nap.phone_consistent,
+            "pages_missing_known_phone": list(plan.nap.pages_missing_known_phone),
+            "pages_missing_known_name": list(plan.nap.pages_missing_known_name),
+            "pages_missing_known_address": list(plan.nap.pages_missing_known_address),
+        },
+        "click_to_call": {
+            "pages_checked": plan.click_to_call.pages_checked,
+            "pages_missing": list(plan.click_to_call.pages_missing),
+        },
+        "schema": {
+            "pages_with_review_schema": list(plan.schema.pages_with_review_schema),
+            "pages_with_faq_schema": list(plan.schema.pages_with_faq_schema),
+        },
+        "has_gbp_link": plan.has_gbp_link,
+        "has_contact_page": plan.has_contact_page,
+        "has_contact_page_map": plan.has_contact_page_map,
+        "plan": [
+            {
+                "title": item.title,
+                "suggested_path": item.suggested_path,
+                "why": item.why,
+                "priority": item.priority,
+            }
+            for item in plan.plan
+        ],
+    }
+
+
 def report_to_dict(report: Report) -> dict[str, Any]:
     """A plain, JSON-serializable representation of ``report``."""
     return {
@@ -191,6 +235,7 @@ def report_to_dict(report: Report) -> dict[str, Any]:
         "vitals": _vitals_to_dict(report.vitals),
         "site_crawl": _site_crawl_to_dict(report.site_crawl),
         "competitors": _compare_to_dict(report.competitors),
+        "content_plan": _content_plan_to_dict(report.content_plan),
     }
 
 

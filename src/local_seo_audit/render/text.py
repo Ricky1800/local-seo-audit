@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from rich.console import Console
 
 from local_seo_audit.compare import CompetitorComparison
+from local_seo_audit.content_gaps import ContentGapPlan
 from local_seo_audit.crawler import SiteCrawlReport
 from local_seo_audit.models import Report, Status
 from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
@@ -126,6 +127,47 @@ def _print_compare(console: Console, comparison: CompetitorComparison) -> None:
         console.print(f"  - {gap.title} (weight {gap.weight}) - ahead: {who}")
 
 
+def _print_content_plan(console: Console, plan: ContentGapPlan) -> None:
+    console.print("")
+    console.print("[bold]Local content gaps[/bold]")
+    label = "inferred from nav/headings" if plan.inferred_services else "as requested"
+    console.print(f"  Services checked ({label}):")
+    for status in plan.services:
+        mark = "[bold green]found[/bold green]" if status.found else "[bold red]missing[/bold red]"
+        suffix = f"  ({status.matched_url})" if status.matched_url else ""
+        console.print(f"    {mark}  {status.query}{suffix}")
+    if plan.areas:
+        console.print("  Areas checked:")
+        for status in plan.areas:
+            mark = (
+                "[bold green]found[/bold green]" if status.found else "[bold red]missing[/bold red]"
+            )
+            console.print(f"    {mark}  {status.query}")
+    console.print(
+        f"  NAP: {len(plan.nap.distinct_phone_numbers)} distinct phone number(s) across "
+        f"{plan.nap.pages_checked} page(s); consistent: {plan.nap.phone_consistent}."
+    )
+    covered = plan.click_to_call.pages_checked - len(plan.click_to_call.pages_missing)
+    console.print(
+        f"  Click-to-call: {covered}/{plan.click_to_call.pages_checked} page(s) have a tel: link."
+    )
+    console.print(
+        f"  Review/AggregateRating schema: {plan.schema.has_review_schema_anywhere}. "
+        f"FAQPage schema: {plan.schema.has_faq_schema_anywhere}."
+    )
+    console.print(
+        f"  Google Business Profile link: {plan.has_gbp_link}. "
+        f"Contact page map: {plan.has_contact_page_map}."
+    )
+    console.print("")
+    console.print("[bold]Content to create[/bold] (prioritized):")
+    if not plan.plan:
+        console.print("  Nothing found - great coverage.")
+    for item in plan.plan:
+        console.print(f"  [{item.priority.upper()}] {item.title}")
+        console.print(f"    {item.why}")
+
+
 def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
     """Render ``report`` as terminal text; ``color=False`` yields plain text (e.g. for a file)."""
     buffer = io.StringIO()
@@ -171,5 +213,8 @@ def render_text(report: Report, *, color: bool = True, width: int = 100) -> str:
 
     if report.competitors is not None:
         _print_compare(console, report.competitors)
+
+    if report.content_plan is not None:
+        _print_content_plan(console, report.content_plan)
 
     return buffer.getvalue()
