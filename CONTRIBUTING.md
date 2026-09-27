@@ -56,10 +56,11 @@ intercept every `httpx` call.
    from local_seo_audit.checks.base import AuditContext, Check
    from local_seo_audit.models import CheckResult, Severity, Status
 
+
    class YourCheck(Check):
        id = "your_check"
        title = "Short human-readable name"
-       weight = 5           # relative importance for scoring
+       weight = 5  # relative importance for scoring
        severity = Severity.MEDIUM
 
        def run(self, ctx: AuditContext) -> CheckResult:

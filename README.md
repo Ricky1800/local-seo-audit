@@ -80,11 +80,11 @@ report = audit(
     crawl=10,
 )
 
-print(report.score, report.grade)          # e.g. 82.5 "B"
-for result in report.sorted_results:       # worst-first
+print(report.score, report.grade)  # e.g. 82.5 "B"
+for result in report.sorted_results:  # worst-first
     print(result.status.value, result.title, result.evidence)
 
-print(render(report, "html"))              # or "text" / "md" / "json"
+print(render(report, "html"))  # or "text" / "md" / "json"
 ```
 
 ## Sample report excerpt
