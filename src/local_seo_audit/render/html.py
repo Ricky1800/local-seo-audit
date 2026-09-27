@@ -1,121 +1,343 @@
-"""Standalone, printable HTML report — inline CSS, no external requests.
+"""Standalone, printable HTML report - inline CSS, no external requests.
 
 This is the format meant to be handed directly to a non-technical business
-owner: it opens in any browser, prints cleanly, and needs nothing else.
+owner: a clean, modern one-page report with a score gauge, an executive
+summary up top, severity-colored findings, and print styles - opens in any
+browser, prints cleanly on a single reasonable page count, and needs nothing
+else (no external fonts, scripts, or stylesheets).
 """
 
 from __future__ import annotations
 
+import math
 from html import escape
 
 from local_seo_audit.compare import CompetitorComparison
 from local_seo_audit.content_gaps import ContentGapPlan, PageMatchStatus
 from local_seo_audit.crawler import SiteCrawlReport
-from local_seo_audit.models import Report, Status
-from local_seo_audit.vitals import LabData, Metric, Rating, StrategyResult, VitalsResult
+from local_seo_audit.models import CheckResult, Report, Severity, Status
+from local_seo_audit.vitals import LabData, Metric, StrategyResult, VitalsResult
 
-_RATING_COLOR: dict[Rating, str] = {
-    "good": "#1a7f37",
-    "needs-improvement": "#9a6700",
-    "poor": "#cf222e",
-}
-
-_STATUS_COLOR = {
-    Status.PASS: "#1a7f37",
-    Status.WARN: "#9a6700",
-    Status.FAIL: "#cf222e",
-    Status.SKIP: "#6e7781",
-}
 _STATUS_LABEL = {Status.PASS: "PASS", Status.WARN: "WARN", Status.FAIL: "FAIL", Status.SKIP: "SKIP"}
-_GRADE_COLOR = {"A": "#1a7f37", "B": "#2da44e", "C": "#9a6700", "D": "#bc4c00", "F": "#cf222e"}
+_GRADE_LABEL = {
+    "A": "Excellent",
+    "B": "Good",
+    "C": "Needs work",
+    "D": "Struggling",
+    "F": "Critical",
+}
+_PRIORITY_LABEL = {"high": "High priority", "medium": "Medium priority", "low": "Low priority"}
 
 _CSS = """
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bg: #f1f3f7;
+  --surface: #ffffff;
+  --surface-muted: #f6f8fb;
+  --border: #e1e4eb;
+  --text: #171a21;
+  --text-muted: #5b6472;
+  --primary: #2452eb;
+  --primary-dark: #1a3bc4;
+  --pass: #157a3d;
+  --pass-bg: #eafaf0;
+  --warn: #9a6a05;
+  --warn-bg: #fdf6e6;
+  --fail: #c0233c;
+  --fail-bg: #fdedf0;
+  --skip: #6b7280;
+  --skip-bg: #f1f2f4;
+  --grade-a: #157a3d;
+  --grade-b: #3f8f35;
+  --grade-c: #b7791f;
+  --grade-d: #c1560c;
+  --grade-f: #c0233c;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-2: 0 6px 16px rgba(16, 24, 40, 0.08);
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-6: 24px; --sp-8: 32px; --sp-10: 40px; --sp-12: 48px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161b; --surface: #1c1f26; --surface-muted: #23262e; --border: #2e323c;
+    --text: #eef0f4; --text-muted: #9aa2b1;
+    --pass-bg: #10301f; --warn-bg: #332506; --fail-bg: #3a1220; --skip-bg: #262932;
+  }
+}
 * { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
 body {
-  margin: 0; padding: 0;
-  background: #f6f8fa;
-  color: #1f2328;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
-main { max-width: 860px; margin: 0 auto; padding: 32px 20px 64px; }
-header { background: #fff; border: 1px solid #d0d7de; border-radius: 12px; padding: 24px; }
-h1 { margin: 0 0 4px; font-size: 1.6rem; }
-p { margin: 4px 0; }
-.url a { color: #0969da; word-break: break-all; }
-.business { font-size: 1.05rem; }
-.generated { color: #57606a; font-size: 0.9rem; }
-.score-card { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
-.score { font-size: 2.6rem; font-weight: 700; }
-.score span { font-size: 1.2rem; font-weight: 400; color: #57606a; }
-.grade {
-  color: #fff; font-weight: 700; font-size: 1.4rem;
-  width: 56px; height: 56px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+.page { max-width: 900px; margin: 0 auto; padding: var(--sp-8) var(--sp-4) var(--sp-12); }
+a { color: var(--primary); }
+h1, h2, h3, h4 { line-height: 1.25; font-weight: 700; }
+h1 { margin: 0; font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); }
+h2 { margin: 0 0 var(--sp-1); font-size: 1.3rem; }
+h3 { margin: var(--sp-4) 0 var(--sp-2); font-size: 1.05rem; }
+p { margin: var(--sp-1) 0; }
+
+.hero {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-6); box-shadow: var(--shadow-2);
 }
-.counts { color: #57606a; }
-.checks { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+.hero-top {
+  display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap;
+  gap: var(--sp-2); color: var(--text-muted); font-size: 0.85rem; margin-bottom: var(--sp-2);
+}
+.brand { font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; font-size: 0.75rem; }
+.target-url { color: var(--text-muted); word-break: break-all; margin-bottom: var(--sp-1); }
+.target-url a { color: var(--primary); }
+.business-name { font-size: 1.05rem; font-weight: 600; }
+
+.score-row {
+  display: flex; align-items: center; gap: var(--sp-6); flex-wrap: wrap; margin-top: var(--sp-6);
+}
+.gauge { width: 128px; height: 128px; flex: none; }
+.gauge-track { fill: none; stroke: var(--border); stroke-width: 12; }
+.gauge-value { fill: none; stroke-width: 12; stroke-linecap: round; }
+.gauge-score {
+  font-size: 32px; font-weight: 800; text-anchor: middle; font-family: var(--font-sans);
+}
+.gauge-outof {
+  font-size: 12px; fill: var(--text-muted); text-anchor: middle; font-family: var(--font-sans);
+}
+
+.score-meta { flex: 1; min-width: 220px; }
+.grade-chip {
+  display: inline-flex; align-items: center; gap: var(--sp-2); font-weight: 700;
+  padding: var(--sp-1) var(--sp-3); border-radius: 999px; font-size: 0.9rem;
+}
+.counts-row { display: flex; gap: var(--sp-4); flex-wrap: wrap; margin-top: var(--sp-3); }
+.count-pill {
+  display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);
+}
+.count-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+.exec-summary {
+  margin-top: var(--sp-6); padding-top: var(--sp-6); border-top: 1px solid var(--border);
+}
+.exec-summary p { color: var(--text); }
+.top-issues { margin: var(--sp-2) 0 0; padding: 0; list-style: none; }
+.top-issues li {
+  display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-2) 0;
+  border-bottom: 1px dashed var(--border);
+}
+.top-issues li:last-child { border-bottom: none; }
+.sev-dot {
+  width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; flex: none;
+}
+
+.report-section { margin-top: var(--sp-8); }
+.section-sub { color: var(--text-muted); font-size: 0.88rem; margin: 0 0 var(--sp-3); }
+.section-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: var(--sp-6); box-shadow: var(--shadow-1);
+}
+
+.checks { margin-top: var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-3); }
 .check {
-  background: #fff; border: 1px solid #d0d7de; border-radius: 10px;
-  padding: 16px 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--border); border-radius: var(--radius-md);
+  padding: var(--sp-4) 20px; box-shadow: var(--shadow-1);
 }
+.check.status-pass { border-left-color: var(--pass); }
+.check.status-warn { border-left-color: var(--warn); }
+.check.status-fail { border-left-color: var(--fail); }
+.check.status-skip { border-left-color: var(--skip); }
 .check h3 {
-  margin: 0 0 8px; font-size: 1.05rem;
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 0 0 var(--sp-2); font-size: 1rem;
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
 }
 .badge {
-  color: #fff; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
-  padding: 2px 8px; border-radius: 999px;
+  color: #fff; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
 }
-.meta { color: #57606a; font-weight: 400; font-size: 0.85rem; }
-.evidence { color: #32383f; }
-.fix { background: #f6f8fa; border-left: 3px solid #0969da; padding: 8px 12px; border-radius: 4px; }
-footer { margin-top: 32px; color: #57606a; font-size: 0.85rem; text-align: center; }
-footer a { color: #0969da; }
-.report-section { margin-top: 28px; }
-.report-section h2 { font-size: 1.25rem; margin: 0 0 4px; }
-.section-sub { color: #57606a; font-size: 0.85rem; margin: 0 0 12px; }
+.meta { color: var(--text-muted); font-weight: 400; font-size: 0.82rem; }
+.evidence { color: var(--text); font-size: 0.95rem; }
+.fix {
+  background: var(--surface-muted); border-left: 3px solid var(--primary);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm);
+  margin-top: var(--sp-2); font-size: 0.92rem;
+}
+
 .vitals-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-3);
 }
 .vitals-card {
-  background: #fff; border: 1px solid #d0d7de; border-radius: 10px; padding: 14px 16px;
+  background: var(--surface-muted); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--sp-4);
 }
-.vitals-card h4 { margin: 0 0 8px; }
-.vitals-note { color: #57606a; font-size: 0.85rem; margin: 6px 0 4px; }
-.vitals-error { color: #cf222e; }
-.metric-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+.vitals-card h4 { margin: 0 0 var(--sp-2); }
+.vitals-note { color: var(--text-muted); font-size: 0.85rem; margin: var(--sp-2) 0 var(--sp-1); }
+.vitals-error { color: var(--fail); }
+.metric-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-1) 0; }
 .metric-chip {
-  border: 1px solid #d0d7de; border-radius: 999px; padding: 2px 10px; font-size: 0.8rem;
-  font-weight: 600;
+  border: 1.5px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.8rem;
+  font-weight: 700; background: var(--surface);
 }
-.metric-missing { color: #57606a; }
-.crawl-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
-.crawl-table th, .crawl-table td {
-  border: 1px solid #d0d7de; padding: 6px 8px; text-align: left; word-break: break-word;
+.metric-missing { color: var(--text-muted); font-weight: 400; }
+
+table.data-table {
+  width: 100%; border-collapse: collapse; margin-top: var(--sp-3); font-size: 0.85rem;
+  background: var(--surface);
 }
-.crawl-table th { background: #f6f8fa; }
+table.data-table th, table.data-table td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: left; word-break: break-word;
+}
+table.data-table th { background: var(--surface-muted); }
+
+.issue-list, .plan-list, .match-list, .gap-list, .metrics-list {
+  margin: var(--sp-2) 0 0; padding-left: 1.1rem;
+}
+.issue-list li, .metrics-list li { margin: 4px 0; }
+.plan-list {
+  list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.plan-item {
+  background: var(--surface-muted); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: var(--sp-3) var(--sp-4);
+}
+.plan-item .why { color: var(--text-muted); font-size: 0.88rem; margin-top: 4px; }
+.match-list { list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: 4px; }
+.match-list li { display: flex; align-items: center; gap: var(--sp-2); }
+
+footer {
+  margin-top: var(--sp-10); color: var(--text-muted); font-size: 0.85rem; text-align: center;
+}
+footer a { color: var(--primary); }
+
 @media print {
   body { background: #fff; }
-  header, .check, .vitals-card { border: 1px solid #ccc; break-inside: avoid; }
+  .page { max-width: none; padding: 0.4in; }
+  .hero, .section-card, .check, .vitals-card, .plan-item { box-shadow: none; }
+  .hero, .check, .vitals-card, .plan-item { border: 1px solid #ccc; }
+  .report-section, .check { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+@media (max-width: 560px) {
+  .score-row { gap: var(--sp-4); }
+  .gauge { width: 104px; height: 104px; }
 }
 """
 
 
-def _check_section(
-    status: Status, title: str, weight: int, severity: str, evidence: str, fix: str
-) -> str:
-    color = _STATUS_COLOR[status]
-    label = _STATUS_LABEL[status]
-    fix_html = ""
-    if status in (Status.WARN, Status.FAIL) and fix:
-        fix_html = f'<p class="fix"><strong>Fix:</strong> {escape(fix)}</p>'
+def _grade_color_var(grade: str) -> str:
+    return {
+        "A": "var(--grade-a)",
+        "B": "var(--grade-b)",
+        "C": "var(--grade-c)",
+        "D": "var(--grade-d)",
+        "F": "var(--grade-f)",
+    }.get(grade, "var(--text-muted)")
+
+
+def _status_color_var(status: Status) -> str:
+    return {
+        Status.PASS: "var(--pass)",
+        Status.WARN: "var(--warn)",
+        Status.FAIL: "var(--fail)",
+        Status.SKIP: "var(--skip)",
+    }[status]
+
+
+def _severity_color_var(severity: Severity) -> str:
+    return {
+        Severity.CRITICAL: "var(--fail)",
+        Severity.HIGH: "var(--fail)",
+        Severity.MEDIUM: "var(--warn)",
+        Severity.LOW: "var(--skip)",
+        Severity.INFO: "var(--skip)",
+    }[severity]
+
+
+def _score_gauge_svg(score: float, grade: str) -> str:
+    """A circular progress ring - the score at a glance, no external assets."""
+    radius = 54
+    circumference = 2 * math.pi * radius
+    fraction = min(max(score, 0.0), 100.0) / 100.0
+    offset = circumference * (1 - fraction)
+    color = _grade_color_var(grade)
+    score_text = f"{score:g}"
     return (
-        f'<section class="check status-{status.value}">'
+        f'<svg viewBox="0 0 140 140" class="gauge" role="img" '
+        f'aria-label="Score {escape(score_text)} out of 100, grade {escape(grade)}">'
+        f'<circle cx="70" cy="70" r="{radius}" class="gauge-track"></circle>'
+        f'<circle cx="70" cy="70" r="{radius}" class="gauge-value" style="stroke:{color}" '
+        f'stroke-dasharray="{circumference:.1f}" stroke-dashoffset="{offset:.1f}" '
+        f'transform="rotate(-90 70 70)"></circle>'
+        f'<text x="70" y="66" class="gauge-score" style="fill:{color}">{escape(score_text)}</text>'
+        f'<text x="70" y="88" class="gauge-outof">/ 100</text>'
+        f"</svg>"
+    )
+
+
+def _executive_summary(report: Report) -> str:
+    counts = report.counts()
+    scored = counts[Status.PASS] + counts[Status.WARN] + counts[Status.FAIL]
+    top_issues = [
+        r
+        for r in report.sorted_results
+        if r.status in (Status.FAIL, Status.WARN)
+        and r.severity in (Severity.CRITICAL, Severity.HIGH)
+    ][:5]
+
+    if report.score >= 90:
+        headline = "This site is in strong shape for local SEO and conversion basics."
+    elif report.score >= 70:
+        headline = "This site has a solid foundation, with a handful of fixable gaps."
+    elif report.score >= 50:
+        headline = "This site is losing customers to fixable local-SEO and conversion problems."
+    else:
+        headline = "This site has serious local-SEO and conversion gaps costing it customers now."
+
+    summary = (
+        f"<p>{escape(headline)} Out of {scored} scored check(s), "
+        f"<strong>{counts[Status.PASS]} pass</strong>, "
+        f"<strong>{counts[Status.WARN]} need attention</strong>, and "
+        f"<strong>{counts[Status.FAIL]} fail outright</strong>.</p>"
+    )
+
+    if top_issues:
+        items = "".join(_top_issue_row(r) for r in top_issues)
+        summary += f'<p><strong>Fix these first:</strong></p><ul class="top-issues">{items}</ul>'
+    else:
+        summary += "<p>No critical or high-severity issues were found. Nice work.</p>"
+
+    return f'<div class="exec-summary"><h2>Executive summary</h2>{summary}</div>'
+
+
+def _top_issue_row(result: CheckResult) -> str:
+    dot_color = _severity_color_var(result.severity)
+    title_html = f"<strong>{escape(result.title)}</strong> &mdash; {escape(result.evidence)}"
+    return (
+        f'<li><span class="sev-dot" style="background:{dot_color}"></span>'
+        f"<span>{title_html}</span></li>"
+    )
+
+
+def _check_section(result: CheckResult) -> str:
+    color = _status_color_var(result.status)
+    label = _STATUS_LABEL[result.status]
+    fix_html = ""
+    if result.status in (Status.WARN, Status.FAIL) and result.fix:
+        fix_html = f'<p class="fix"><strong>Fix:</strong> {escape(result.fix)}</p>'
+    return (
+        f'<section class="check status-{result.status.value}">'
         f'<h3><span class="badge" style="background:{color}">{label}</span> '
-        f'{escape(title)}<span class="meta">weight {weight} · {escape(severity)}</span></h3>'
-        f'<p class="evidence">{escape(evidence)}</p>'
+        f"{escape(result.title)}"
+        f'<span class="meta">weight {result.weight} &middot; {escape(result.severity.value)}</span>'
+        f"</h3>"
+        f'<p class="evidence">{escape(result.evidence)}</p>'
         f"{fix_html}"
         f"</section>"
     )
@@ -124,7 +346,11 @@ def _check_section(
 def _metric_chip(metric: Metric | None) -> str:
     if metric is None:
         return '<span class="metric-chip metric-missing">n/a</span>'
-    color = _RATING_COLOR[metric.rating]
+    color = {
+        "good": "var(--pass)",
+        "needs-improvement": "var(--warn)",
+        "poor": "var(--fail)",
+    }[metric.rating]
     value = f"{metric.value:.2f}" if metric.unit == "" else f"{metric.value:.0f}{metric.unit}"
     return (
         f'<span class="metric-chip" style="border-color:{color};color:{color}">'
@@ -155,7 +381,9 @@ def _strategy_card(result: StrategyResult) -> str:
         opp_html = ""
         if lab.opportunities:
             items = "".join(f"<li>{escape(o)}</li>" for o in lab.opportunities)
-            opp_html = f'<p class="vitals-note">Top opportunities:</p><ul>{items}</ul>'
+            opp_html = (
+                f'<p class="vitals-note">Top opportunities:</p><ul class="issue-list">{items}</ul>'
+            )
         lab_note = f"Lab (Lighthouse) performance: <strong>{escape(score)}</strong>"
         lab_html = (
             f'<p class="vitals-note">{lab_note}</p>'
@@ -177,11 +405,11 @@ def _vitals_section(vitals: VitalsResult | None) -> str:
         return ""
     cards = "".join(_strategy_card(r) for r in vitals.by_strategy())
     return (
-        '<section class="report-section vitals">'
+        '<section class="report-section vitals"><div class="section-card">'
         "<h2>Core Web Vitals</h2>"
         '<p class="section-sub">Source: Google PageSpeed Insights.</p>'
         f'<div class="vitals-grid">{cards}</div>'
-        "</section>"
+        "</div></section>"
     )
 
 
@@ -216,16 +444,18 @@ def _site_crawl_section(crawl: SiteCrawlReport | None) -> str:
             _issue_row("crawled page(s) missing from the sitemap", len(crawl.missing_from_sitemap)),
         ]
     )
+    no_issues = "<p>No site-level issues found.</p>"
+    issues_html = f'<ul class="issue-list">{issues}</ul>' if issues else no_issues
     return (
-        '<section class="report-section site-crawl">'
+        '<section class="report-section site-crawl"><div class="section-card">'
         "<h2>Site crawl</h2>"
         f'<p class="section-sub">Visited {crawl.pages_crawled} page(s) '
         f"(cap {crawl.max_pages}); {len(crawl.sitemap_urls)} URL(s) in the sitemap; "
         f"{crawl.issue_count()} site-level issue(s) found.</p>"
-        f"<ul>{issues}</ul>"
-        '<table class="crawl-table"><thead><tr><th>URL</th><th>Status</th><th>Depth</th>'
+        f"{issues_html}"
+        '<table class="data-table"><thead><tr><th>URL</th><th>Status</th><th>Depth</th>'
         f"<th>Title</th><th>Words</th></tr></thead><tbody>{page_rows}</tbody></table>"
-        "</section>"
+        "</div></section>"
     )
 
 
@@ -246,7 +476,7 @@ def _compare_section(comparison: CompetitorComparison | None) -> str:
         f"{escape(', '.join(gap.ahead_competitors))}</li>"
         for gap in comparison.gaps
     )
-    gaps_html = f"<ul>{gap_items}</ul>" if gap_items else "<p>None found.</p>"
+    gaps_html = f'<ul class="gap-list">{gap_items}</ul>' if gap_items else "<p>None found.</p>"
 
     metrics_items = "".join(
         f"<li>{escape(entry.url)}: "
@@ -257,83 +487,98 @@ def _compare_section(comparison: CompetitorComparison | None) -> str:
     )
 
     return (
-        '<section class="report-section compare">'
+        '<section class="report-section compare"><div class="section-card">'
         "<h2>Competitor compare</h2>"
-        f'<table class="crawl-table"><thead><tr>{header_cells}</tr></thead>'
+        '<p class="section-sub">Same checks, side by side.</p>'
+        f'<table class="data-table"><thead><tr>{header_cells}</tr></thead>'
         f"<tbody>{rows}</tbody></table>"
-        f"<h3>Key metrics</h3><ul>{metrics_items}</ul>"
+        f'<h3>Key metrics</h3><ul class="metrics-list">{metrics_items}</ul>'
         "<h3>Gaps (they have it, you don't)</h3>"
         f"{gaps_html}"
-        "</section>"
+        "</div></section>"
     )
-
-
-_PRIORITY_COLOR = {"high": "#cf222e", "medium": "#9a6700", "low": "#57606a"}
 
 
 def _match_list(statuses: tuple[PageMatchStatus, ...]) -> str:
     items = []
     for status in statuses:
         badge = (
-            '<span class="badge" style="background:#1a7f37">FOUND</span>'
+            '<span class="badge" style="background:var(--pass)">FOUND</span>'
             if status.found
-            else '<span class="badge" style="background:#cf222e">MISSING</span>'
+            else '<span class="badge" style="background:var(--fail)">MISSING</span>'
         )
         suffix = f" &mdash; {escape(status.matched_url)}" if status.matched_url else ""
         items.append(f"<li>{badge} {escape(status.query)}{suffix}</li>")
-    return f"<ul>{''.join(items)}</ul>" if items else "<p>None specified.</p>"
+    return f'<ul class="match-list">{"".join(items)}</ul>' if items else "<p>None specified.</p>"
 
 
 def _content_plan_section(plan: ContentGapPlan | None) -> str:
     if plan is None:
         return ""
+    priority_color = {"high": "var(--fail)", "medium": "var(--warn)", "low": "var(--skip)"}
     label = "inferred from nav/headings" if plan.inferred_services else "as requested"
     plan_items = "".join(
-        f'<li><span class="badge" style="background:{_PRIORITY_COLOR[item.priority]}">'
-        f"{item.priority.upper()}</span> <strong>{escape(item.title)}</strong>"
-        f'<br><span class="vitals-note">{escape(item.why)}</span></li>'
+        '<li class="plan-item">'
+        f'<span class="badge" style="background:{priority_color[item.priority]}">'
+        f"{escape(_PRIORITY_LABEL[item.priority])}</span> "
+        f"<strong>{escape(item.title)}</strong>"
+        f'<div class="why">{escape(item.why)}</div></li>'
         for item in plan.plan
     )
-    plan_html = f"<ul>{plan_items}</ul>" if plan_items else "<p>Nothing found - great coverage.</p>"
+    plan_html = (
+        f'<ul class="plan-list">{plan_items}</ul>'
+        if plan_items
+        else "<p>Nothing found - great coverage.</p>"
+    )
+
+    areas_html = f"<h3>Areas checked</h3>{_match_list(plan.areas)}" if plan.areas else ""
 
     return (
-        '<section class="report-section content-gaps">'
+        '<section class="report-section content-gaps"><div class="section-card">'
         "<h2>Local content gaps</h2>"
         f"<h3>Services checked ({escape(label)})</h3>"
         f"{_match_list(plan.services)}"
-        + (f"<h3>Areas checked</h3>{_match_list(plan.areas)}" if plan.areas else "")
-        + "<h3>NAP, schema &amp; coverage</h3>"
-        + "<ul>"
-        + f"<li>{len(plan.nap.distinct_phone_numbers)} distinct phone number(s) across "
-        + f"{plan.nap.pages_checked} page(s); consistent: {plan.nap.phone_consistent}.</li>"
-        + "<li>Click-to-call present on "
-        + f"{plan.click_to_call.pages_checked - len(plan.click_to_call.pages_missing)}/"
-        + f"{plan.click_to_call.pages_checked} page(s).</li>"
-        + f"<li>Review/AggregateRating schema: {plan.schema.has_review_schema_anywhere}. "
-        + f"FAQPage schema: {plan.schema.has_faq_schema_anywhere}.</li>"
-        + f"<li>Google Business Profile link: {plan.has_gbp_link}. "
-        + f"Contact page map: {plan.has_contact_page_map}.</li>"
-        + "</ul>"
-        + "<h3>Content to create (prioritized)</h3>"
-        + plan_html
-        + "</section>"
+        f"{areas_html}"
+        "<h3>NAP, schema &amp; coverage</h3>"
+        '<ul class="issue-list">'
+        f"<li>{len(plan.nap.distinct_phone_numbers)} distinct phone number(s) across "
+        f"{plan.nap.pages_checked} page(s); consistent: {plan.nap.phone_consistent}.</li>"
+        "<li>Click-to-call present on "
+        f"{plan.click_to_call.pages_checked - len(plan.click_to_call.pages_missing)}/"
+        f"{plan.click_to_call.pages_checked} page(s).</li>"
+        f"<li>Review/AggregateRating schema: {plan.schema.has_review_schema_anywhere}. "
+        f"FAQPage schema: {plan.schema.has_faq_schema_anywhere}.</li>"
+        f"<li>Google Business Profile link: {plan.has_gbp_link}. "
+        f"Contact page map: {plan.has_contact_page_map}.</li>"
+        "</ul>"
+        "<h3>Content to create (prioritized)</h3>"
+        f"{plan_html}"
+        "</div></section>"
     )
 
 
 def render_html(report: Report) -> str:
     counts = report.counts()
-    rows = "".join(
-        _check_section(r.status, r.title, r.weight, r.severity.value, r.evidence, r.fix)
-        for r in report.sorted_results
-    )
+    rows = "".join(_check_section(r) for r in report.sorted_results)
 
     business_line = ""
     if report.business.name:
-        business_name = escape(report.business.name)
-        business_line = f'<p class="business">Business: <strong>{business_name}</strong></p>'
+        business_line = f'<p class="business-name">{escape(report.business.name)}</p>'
 
-    grade_color = _GRADE_COLOR.get(report.grade, "#57606a")
+    grade_color = _grade_color_var(report.grade)
+    grade_desc = _GRADE_LABEL.get(report.grade, "")
     safe_url = escape(report.url)
+
+    count_pills = "".join(
+        f'<span class="count-pill"><span class="count-dot" style="background:{color}"></span>'
+        f"{count} {label}</span>"
+        for label, count, color in (
+            ("passed", counts[Status.PASS], "var(--pass)"),
+            ("need attention", counts[Status.WARN], "var(--warn)"),
+            ("failed", counts[Status.FAIL], "var(--fail)"),
+            ("skipped", counts[Status.SKIP], "var(--skip)"),
+        )
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -344,21 +589,27 @@ def render_html(report: Report) -> str:
 <style>{_CSS}</style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Local SEO Audit</h1>
-    <p class="url"><a href="{safe_url}">{safe_url}</a></p>
-    {business_line}
-    <p class="generated">Generated {report.generated_at:%Y-%m-%d %H:%M}</p>
-    <div class="score-card">
-      <div class="score" style="color:{grade_color}">{report.score}<span>/100</span></div>
-      <div class="grade" style="background:{grade_color}">{escape(report.grade)}</div>
+<div class="page">
+  <header class="hero">
+    <div class="hero-top">
+      <span class="brand">Local SEO Audit</span>
+      <span class="generated">Generated {report.generated_at:%Y-%m-%d %H:%M}</span>
     </div>
-    <p class="counts">
-      Pass: {counts[Status.PASS]} &nbsp; Warn: {counts[Status.WARN]} &nbsp;
-      Fail: {counts[Status.FAIL]} &nbsp; Skipped: {counts[Status.SKIP]}
-    </p>
+    <h1>{escape(report.business.name or report.url)}</h1>
+    {business_line}
+    <p class="target-url"><a href="{safe_url}">{safe_url}</a></p>
+    <div class="score-row">
+      {_score_gauge_svg(report.score, report.grade)}
+      <div class="score-meta">
+        <span class="grade-chip" style="color:{grade_color};background:{grade_color}22">
+          Grade {escape(report.grade)} &middot; {escape(grade_desc)}
+        </span>
+        <div class="counts-row">{count_pills}</div>
+      </div>
+    </div>
+    {_executive_summary(report)}
   </header>
+
   <section class="checks">
     {rows}
   </section>
@@ -371,7 +622,7 @@ def render_html(report: Report) -> str:
       <a href="https://github.com/Ricky1800/local-seo-audit">local-seo-audit</a>
       v{escape(report.tool_version)} &mdash; free and open source.</p>
   </footer>
-</main>
+</div>
 </body>
 </html>
 """
