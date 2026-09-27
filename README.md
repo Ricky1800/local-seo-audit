@@ -22,6 +22,12 @@ and hand to whoever manages their website.
 ## Install
 
 ```bash
+pipx install local-seo-audit   # (once published to PyPI)
+```
+
+Until then (or if you prefer installing straight from source):
+
+```bash
 pipx install git+https://github.com/Ricky1800/local-seo-audit
 ```
 
