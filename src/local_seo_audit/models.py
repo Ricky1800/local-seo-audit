@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import Enum
 
 from local_seo_audit.business import Business
+from local_seo_audit.vitals import VitalsResult
 
 
 class Status(str, Enum):
@@ -102,6 +103,8 @@ class Report:
     results: list[CheckResult] = field(default_factory=list)
     generated_at: datetime = field(default_factory=datetime.now)
     tool_version: str = "0.1.0"
+    #: Populated only when ``--vitals`` (or ``audit(..., vitals=True)``) was requested.
+    vitals: VitalsResult | None = None
 
     @property
     def score(self) -> float:

@@ -101,6 +101,22 @@ def test_crawl_flag_is_parsed(respx_mock: respx.MockRouter, good_site_html: str)
     assert exit_code == 0
 
 
+def test_vitals_flag_is_parsed(respx_mock: respx.MockRouter, good_site_html: str) -> None:
+    from local_seo_audit.vitals import PSI_ENDPOINT
+
+    _mock_simple_site(respx_mock, "https://www.joesplumbingnj.com", good_site_html)
+    respx_mock.get(PSI_ENDPOINT, params={"strategy": "mobile"}).mock(
+        return_value=httpx.Response(200, json={"id": "x"})
+    )
+    respx_mock.get(PSI_ENDPOINT, params={"strategy": "desktop"}).mock(
+        return_value=httpx.Response(200, json={"id": "x"})
+    )
+
+    exit_code = main(["https://www.joesplumbingnj.com/", "--vitals", "--format", "json"])
+
+    assert exit_code == 0
+
+
 def test_network_failure_returns_exit_code_one(
     respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
 ) -> None:

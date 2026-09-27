@@ -9,6 +9,7 @@ from local_seo_audit.business import Business
 from local_seo_audit.checks.https_redirect import HttpsRedirectCheck
 from local_seo_audit.core import audit
 from local_seo_audit.models import Status
+from local_seo_audit.vitals import PSI_ENDPOINT
 
 
 def _mock_common(
@@ -174,3 +175,42 @@ def test_crawl_not_requested_is_skipped(respx_mock: respx.MockRouter) -> None:
 
     crawl_result = next(r for r in report.results if r.id == "crawl_broken_links")
     assert crawl_result.status is Status.SKIP
+
+
+def test_vitals_defaults_to_none(respx_mock: respx.MockRouter) -> None:
+    html = "<html></html>"
+    respx_mock.get("https://novitals.example/").mock(return_value=httpx.Response(200, text=html))
+    respx_mock.get("http://novitals.example/").mock(
+        return_value=httpx.Response(301, headers={"Location": "https://novitals.example/"})
+    )
+    respx_mock.get("https://novitals.example/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://novitals.example/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get("https://novitals.example/favicon.ico").mock(return_value=httpx.Response(404))
+
+    report = audit("https://novitals.example/")
+
+    assert report.vitals is None
+
+
+def test_vitals_true_fetches_core_web_vitals(respx_mock: respx.MockRouter) -> None:
+    html = "<html></html>"
+    origin = "https://vitalssite.example"
+    respx_mock.get(f"{origin}/").mock(return_value=httpx.Response(200, text=html))
+    respx_mock.get(f"http://{origin.removeprefix('https://')}/").mock(
+        return_value=httpx.Response(301, headers={"Location": f"{origin}/"})
+    )
+    respx_mock.get(f"{origin}/robots.txt").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/sitemap.xml").mock(return_value=httpx.Response(404))
+    respx_mock.get(f"{origin}/favicon.ico").mock(return_value=httpx.Response(404))
+    respx_mock.get(PSI_ENDPOINT, params={"strategy": "mobile"}).mock(
+        return_value=httpx.Response(200, json={"id": origin})
+    )
+    respx_mock.get(PSI_ENDPOINT, params={"strategy": "desktop"}).mock(
+        return_value=httpx.Response(200, json={"id": origin})
+    )
+
+    report = audit(f"{origin}/", vitals=True)
+
+    assert report.vitals is not None
+    assert report.vitals.mobile is not None
+    assert report.vitals.mobile.error is not None  # fixture has no usable field/lab data

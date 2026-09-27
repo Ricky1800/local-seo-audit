@@ -45,6 +45,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Also crawl up to N same-host internal links, checking for broken links (max 50)",
     )
+    parser.add_argument(
+        "--vitals",
+        action="store_true",
+        help=(
+            "Also fetch Core Web Vitals (mobile + desktop) from Google PageSpeed Insights. "
+            "Off by default: slow, and calls a third-party API. Uses PSI_API_KEY if set."
+        ),
+    )
     parser.add_argument("--version", action="version", version=f"local-seo-audit {__version__}")
     return parser
 
@@ -70,7 +78,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     business = Business(name=args.name, phone=args.phone, city=args.city, address=args.address)
 
     try:
-        report = audit(args.url, business=business, crawl=max(args.crawl, 0))
+        report = audit(args.url, business=business, crawl=max(args.crawl, 0), vitals=args.vitals)
     except Exception as exc:  # pragma: no cover - audit() itself does not raise in practice
         print(f"local-seo-audit: error auditing {args.url}: {exc}", file=sys.stderr)
         return 1

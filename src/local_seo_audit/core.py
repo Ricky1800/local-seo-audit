@@ -13,6 +13,7 @@ from local_seo_audit.checks import ALL_CHECKS, AuditContext, CrawlLinkStatus, Cr
 from local_seo_audit.fetcher import FetchResult, fetch, new_client
 from local_seo_audit.models import Report
 from local_seo_audit.utils import ensure_scheme, same_host
+from local_seo_audit.vitals import VitalsResult, fetch_core_web_vitals
 
 #: Internal links are checked one homepage-depth deep; this keeps runs fast and
 #: avoids ever making an unbounded number of requests to someone else's server.
@@ -77,6 +78,8 @@ def audit(
     *,
     crawl: int = 0,
     client: httpx.Client | None = None,
+    vitals: bool = False,
+    psi_api_key: str | None = None,
 ) -> Report:
     """Audit ``url`` and return a fully-scored :class:`Report`.
 
@@ -89,6 +92,12 @@ def audit(
             (capped at 50) looking for broken links.
         client: An existing :class:`httpx.Client` to reuse (mainly for tests).
             When omitted, a new client is created and closed automatically.
+        vitals: If true, also fetch Core Web Vitals (mobile + desktop) from
+            Google's PageSpeed Insights API. Off by default: it is a slow,
+            separate network call to a third-party API.
+        psi_api_key: Optional PageSpeed Insights API key. Falls back to the
+            ``PSI_API_KEY`` environment variable, then to an unauthenticated
+            (rate-limited) request.
     """
     business = business or Business()
     target = ensure_scheme(url.strip())
@@ -128,12 +137,18 @@ def audit(
             fetched_at=datetime.now(),
         )
         results = [check.run(ctx) for check in ALL_CHECKS]
+
+        vitals_result: VitalsResult | None = None
+        if vitals:
+            vitals_result = fetch_core_web_vitals(ctx.page_url, api_key=psi_api_key)
+
         return Report(
             url=target,
             final_url=primary.final_url or target,
             business=business,
             results=results,
             generated_at=ctx.fetched_at,
+            vitals=vitals_result,
         )
     finally:
         if owns_client:

@@ -1,0 +1,70 @@
+{
+  "captchaResult": "CAPTCHA_NOT_NEEDED",
+  "id": "https://www.joesplumbingnj.com/",
+  "loadingExperience": {
+    "id": "https://www.joesplumbingnj.com/",
+    "metrics": {
+      "LARGEST_CONTENTFUL_PAINT_MS": {
+        "percentile": 2100,
+        "category": "FAST"
+      },
+      "INTERACTION_TO_NEXT_PAINT": {
+        "percentile": 150,
+        "category": "FAST"
+      },
+      "CUMULATIVE_LAYOUT_SHIFT_SCORE": {
+        "percentile": 5,
+        "category": "FAST"
+      }
+    },
+    "overall_category": "FAST"
+  },
+  "lighthouseResult": {
+    "requestedUrl": "https://www.joesplumbingnj.com/",
+    "categories": {
+      "performance": {
+        "id": "performance",
+        "title": "Performance",
+        "score": 0.94
+      }
+    },
+    "audits": {
+      "largest-contentful-paint": {
+        "id": "largest-contentful-paint",
+        "title": "Largest Contentful Paint",
+        "numericValue": 1900.0,
+        "displayValue": "1.9 s"
+      },
+      "total-blocking-time": {
+        "id": "total-blocking-time",
+        "title": "Total Blocking Time",
+        "numericValue": 80.0,
+        "displayValue": "80 ms"
+      },
+      "cumulative-layout-shift": {
+        "id": "cumulative-layout-shift",
+        "title": "Cumulative Layout Shift",
+        "numericValue": 0.03,
+        "displayValue": "0.03"
+      },
+      "render-blocking-resources": {
+        "id": "render-blocking-resources",
+        "title": "Eliminate render-blocking resources",
+        "score": 0.4,
+        "details": {
+          "type": "opportunity",
+          "overallSavingsMs": 320
+        }
+      },
+      "unused-css-rules": {
+        "id": "unused-css-rules",
+        "title": "Reduce unused CSS",
+        "score": 0.6,
+        "details": {
+          "type": "opportunity",
+          "overallSavingsMs": 110
+        }
+      }
+    }
+  }
+}
