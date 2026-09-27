@@ -10,6 +10,7 @@ from __future__ import annotations
 from local_seo_audit.checks.base import AuditContext, Check, CrawlLinkStatus, CrawlResult
 from local_seo_audit.checks.canonical import CanonicalCheck
 from local_seo_audit.checks.click_to_call import ClickToCallCheck
+from local_seo_audit.checks.crawl_links import CrawlBrokenLinksCheck
 from local_seo_audit.checks.favicon import FaviconCheck
 from local_seo_audit.checks.h1 import H1Check
 from local_seo_audit.checks.https_redirect import HttpsRedirectCheck
@@ -40,6 +41,7 @@ ALL_CHECKS: list[Check] = [
     PageWeightCheck(),
     OpenGraphCheck(),
     FaviconCheck(),
+    CrawlBrokenLinksCheck(),
 ]
 
 __all__ = [
@@ -48,6 +50,7 @@ __all__ = [
     "CanonicalCheck",
     "Check",
     "ClickToCallCheck",
+    "CrawlBrokenLinksCheck",
     "CrawlLinkStatus",
     "CrawlResult",
     "FaviconCheck",
