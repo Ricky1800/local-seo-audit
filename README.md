@@ -1,8 +1,14 @@
 # local-seo-audit
 
+[![CI](https://github.com/Ricky1800/local-seo-audit/actions/workflows/ci.yml/badge.svg)](https://github.com/Ricky1800/local-seo-audit/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/tag/Ricky1800/local-seo-audit?label=release)](https://github.com/Ricky1800/local-seo-audit/tags)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 A CLI and Python library that audits a local business's website for
 **local-SEO and conversion basics**, and prints a prioritized, plain-English
 fix list a non-technical owner can actually act on.
+
+![local-seo-audit HTML report](docs/images/report-top.png)
 
 ## The problem
 
@@ -243,6 +249,27 @@ Sample plan (generated from the `tests/fixtures/site_crawl` fixture site):
 
 `--services`/`--areas` also work without `--site` (a lighter, homepage-only
 version of the same analysis).
+
+## Screenshots
+
+Generated with `--format html --compare <competitor> --services ... --areas ...`
+against the `tests/fixtures/good_site` and `tests/fixtures/competitors` fixtures
+(served locally), so the score, gaps, and copy below are real tool output, not
+mockups.
+
+**Top of the HTML report** — score gauge, executive summary, and the
+prioritized fix list:
+
+![Top of the HTML report](docs/images/report-top.png)
+
+**Local content gaps section** — the same report's service/area coverage
+matrix and prioritized content plan:
+
+![Local content gaps detail](docs/images/report-content-plan.png)
+
+**Terminal output** (`--format text`, default color output):
+
+![local-seo-audit terminal output](docs/images/terminal-output.png)
 
 ## Sample report excerpt
 
