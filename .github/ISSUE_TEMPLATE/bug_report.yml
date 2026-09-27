@@ -1,0 +1,67 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out as much
+        of this as you can — it makes it much faster to fix.
+
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      description: The exact `local-seo-audit` command (or library call) that triggered the bug.
+      placeholder: local-seo-audit https://example.com --format html --out report.html
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full error output/traceback if there is one.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: local-seo-audit version
+      description: Output of `local-seo-audit --version`
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: Output of `python --version`
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: The URL being audited (if it's public and safe to share), or anything else useful.

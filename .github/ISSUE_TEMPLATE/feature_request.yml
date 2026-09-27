@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a new check, output format, or other improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggestions for new checks are especially welcome — see
+        `ROADMAP_ISSUES.md` for ideas already planned.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feature is this?
+      options:
+        - New check
+        - New output format
+        - CLI/library API change
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What local-SEO/conversion issue would this catch, or what workflow would it improve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: If this is a new check, describe what it should look for and what the plain-English fix message should say.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
