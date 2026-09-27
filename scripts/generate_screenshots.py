@@ -115,13 +115,12 @@ def build_report() -> tuple[str, str]:
     with tempfile.TemporaryDirectory() as tmp:
         competitor_dir = Path(tmp) / "competitor"
         competitor_dir.mkdir()
-        shutil.copy(
-            FIXTURES / "competitors" / "strong.html", competitor_dir / "index.html"
-        )
+        shutil.copy(FIXTURES / "competitors" / "strong.html", competitor_dir / "index.html")
 
-        with serve_dir(FIXTURES / "good_site") as site_url, serve_dir(
-            competitor_dir
-        ) as competitor_url:
+        with (
+            serve_dir(FIXTURES / "good_site") as site_url,
+            serve_dir(competitor_dir) as competitor_url,
+        ):
             business = Business(
                 name="Joe's Plumbing",
                 phone="(609) 555-0100",
@@ -198,9 +197,7 @@ def main() -> int:
             page = browser.new_page(viewport={"width": 1040, "height": 800})
             page.goto(terminal_path.as_uri())
             page.wait_for_timeout(150)
-            page.query_selector(".window").screenshot(
-                path=str(IMAGES_DIR / "terminal-output.png")
-            )
+            page.query_selector(".window").screenshot(path=str(IMAGES_DIR / "terminal-output.png"))
             page.close()
 
             browser.close()

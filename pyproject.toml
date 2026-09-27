@@ -66,6 +66,10 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "W"]
 ignore = []
 
+[tool.ruff.lint.per-file-ignores]
+# Inline HTML/CSS templates used only to render README screenshots.
+"scripts/generate_screenshots.py" = ["E501"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["local_seo_audit"]
 
