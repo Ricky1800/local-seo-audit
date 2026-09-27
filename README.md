@@ -198,6 +198,11 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for how
 to set up the project, the coding standards (ruff + mypy --strict + pytest),
 and how to add a new check.
 
+## Authors
+
+- [@Ricky1800](https://github.com/Ricky1800)
+- [@orbitwebsites-cloud](https://github.com/orbitwebsites-cloud) ([OrbitBoyzz](https://orbitboyzz.me))
+
 ## License
 
 [MIT](LICENSE) © 2026 Ricky1800
