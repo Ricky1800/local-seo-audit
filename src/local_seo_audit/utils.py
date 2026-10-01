@@ -61,3 +61,13 @@ def human_bytes(num_bytes: int) -> str:
             return f"{value:.1f} {unit}"
         value /= 1024
     return f"{value:.1f} GB"  # pragma: no cover - unreachable for real pages
+
+
+def slugify_url(url: str) -> str:
+    """Turn a URL into a filesystem-safe slug (e.g. 'joesplumbingnj-com')."""
+    parsed = urlparse(ensure_scheme(url))
+    host = parsed.netloc.lower().removeprefix("www.")
+    path = parsed.path.strip("/")
+    combined = f"{host}-{path}" if path else host
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", combined).strip("-")
+    return slug or "site"

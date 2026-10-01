@@ -90,9 +90,32 @@ local-seo-audit [-h] [--name NAME] [--phone PHONE] [--city CITY]
 - `--compare URL` — audit a competitor with the same checks and compare
   side by side. Repeatable, up to 3 times. See
   [Competitor compare](#competitor-compare---compare-url).
+- `--batch PATH` — audit multiple businesses from a CSV file (columns: `url,name,phone,city,address`). See [Batch mode](#batch-mode---batch----out-dir).
+- `--out-dir PATH` — directory to write per-site reports and summary files when using `--batch` (default: `reports/`).
 - `--services LIST` / `--areas LIST` — comma-separated service names and
   city/service-area names to check for a dedicated landing page. See
   [Local content gaps](#local-content-gaps---services----areas).
+
+### Batch mode (`--batch`, `--out-dir`)
+
+Audit many local business leads from a CSV file at once:
+
+```bash
+local-seo-audit --batch leads.csv --format html --out-dir reports/
+```
+
+**Example `leads.csv`:**
+```csv
+url,name,phone,city,address
+https://joesplumbingnj.com,Joe's Plumbing,609-555-0100,Princeton,123 Main St
+https://elitehaircare.fr,Elite Hair Care,,Paris,
+https://acmedental.com,Acme Dental,212-555-0199,New York,
+```
+
+This outputs:
+- Individual report files named from slugified URLs (e.g. `reports/joesplumbingnj-com.html`).
+- A consolidated `reports/summary.json` and `reports/summary.csv` with scores, grades, and pass/warn/fail counts.
+- Respects all other flags such as `--crawl` or `--vitals` for each row.
 
 ### Library usage
 

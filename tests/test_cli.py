@@ -208,3 +208,55 @@ def test_network_failure_returns_exit_code_one(
 
     exit_code = main(["https://example.com/"])
     assert exit_code == 1
+
+
+def test_batch_mode_success(
+    respx_mock: respx.MockRouter, tmp_path: Path, good_site_html: str
+) -> None:
+    _mock_simple_site(respx_mock, "https://www.site1.com", good_site_html)
+    _mock_simple_site(respx_mock, "https://www.site2.com", good_site_html)
+
+    csv_file = tmp_path / "leads.csv"
+    csv_file.write_text(
+        "url,name,phone,city,address\n"
+        "https://www.site1.com,Site One,609-555-0101,Princeton,123 Main St\n"
+        "https://www.site2.com,Site Two,609-555-0102,Plainsboro,456 High St\n",
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "reports"
+
+    exit_code = main(
+        [
+            "--batch",
+            str(csv_file),
+            "--format",
+            "html",
+            "--out-dir",
+            str(out_dir),
+        ]
+    )
+
+    assert exit_code == 0
+    assert (out_dir / "site1-com.html").exists()
+    assert (out_dir / "site2-com.html").exists()
+    assert (out_dir / "summary.json").exists()
+    assert (out_dir / "summary.csv").exists()
+
+    summary_json = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
+    assert len(summary_json) == 2
+    assert summary_json[0]["url"] == "https://www.site1.com"
+    assert summary_json[0]["name"] == "Site One"
+    assert "score" in summary_json[0]
+    assert "grade" in summary_json[0]
+
+
+def test_batch_mode_file_not_found(tmp_path: Path) -> None:
+    exit_code = main(["--batch", str(tmp_path / "nonexistent.csv")])
+    assert exit_code == 1
+
+
+def test_batch_mode_empty_csv(tmp_path: Path) -> None:
+    empty_csv = tmp_path / "empty.csv"
+    empty_csv.write_text("", encoding="utf-8")
+    exit_code = main(["--batch", str(empty_csv)])
+    assert exit_code == 1

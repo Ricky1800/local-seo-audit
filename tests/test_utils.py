@@ -6,6 +6,7 @@ from local_seo_audit.utils import (
     normalize_phone,
     phone_variants_in_text,
     same_host,
+    slugify_url,
 )
 
 
@@ -66,3 +67,17 @@ class TestHumanBytes:
 
     def test_megabytes(self) -> None:
         assert human_bytes(5 * 1024 * 1024) == "5.0 MB"
+
+
+class TestSlugifyUrl:
+    def test_standard_url(self) -> None:
+        assert slugify_url("https://www.example.com") == "example-com"
+
+    def test_url_with_path(self) -> None:
+        assert (
+            slugify_url("https://example.com/services/plumbing")
+            == "example-com-services-plumbing"
+        )
+
+    def test_bare_host(self) -> None:
+        assert slugify_url("joesplumbing.com") == "joesplumbing-com"
